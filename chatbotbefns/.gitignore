@@ -1,0 +1,40 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+.venv/
+env/
+ENV/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# VSCode / PyCharm
+.vscode/
+.idea/
+
+# Mac OS / Linux
+.DS_Store
+*.swp
+
+# Logs
+*.log
+
+# Environment variable files
+.env
+*.env
+
+# Local build artifacts
+build/
+dist/
+*.egg-info/
+
+# Pip dependency files
+pip-log.txt
+
+# Cache
+.cache/
