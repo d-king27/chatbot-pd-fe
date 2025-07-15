@@ -14,7 +14,7 @@ load_dotenv()
 # Initialize clients
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-index = pc.Index("chatbot-pd")  # Connect to existing index
+index = pc.Index("gh-index")  # Connect to existing index
 
 def get_embedding(text):
     """Get embedding for a given text using OpenAI"""
