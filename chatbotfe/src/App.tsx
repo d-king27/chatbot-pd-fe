@@ -15,7 +15,7 @@ import './app.css';
 interface Message {
   id: number;
   text: string;
-  sender: 'user' | 'bot';
+  sender: 'user' | 'bot' | 'loading';
   timestamp: Date;
 }
 
@@ -29,30 +29,68 @@ function App() {
     }
   ]);
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (input.trim() === '') return;
-    
+
+    // Add user message
     const newUserMessage: Message = {
       id: messages.length + 1,
       text: input,
       sender: 'user',
       timestamp: new Date()
     };
-    
-    setMessages([...messages, newUserMessage]);
+    setMessages(prev => [...prev, newUserMessage]);
+
+    const userInput = input; // preserve input
     setInput('');
-    
-    // Simulate bot response
-    setTimeout(() => {
-      const newBotMessage: Message = {
-        id: messages.length + 2,
-        text: `I received your message: "${input}"`,
-        sender: 'bot',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, newBotMessage]);
-    }, 1000);
+
+    // Show "bot is typing" message
+    setLoading(true);
+    const loadingMessage: Message = {
+      id: messages.length + 2,
+      text: 'Bot is typing...',
+      sender: 'loading',
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, loadingMessage]);
+
+    try {
+      // Call API
+      const response = await fetch('https://chatbot-pd-fe.onrender.com/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: userInput })
+      });
+
+      const data = await response.json();
+      const botReply = data.response || 'Sorry, no response received.';
+
+      // Replace "Bot is typing..." with actual response
+      setMessages(prev => [
+        ...prev.filter(msg => msg.sender !== 'loading'),
+        {
+          id: prev.length + 1,
+          text: botReply,
+          sender: 'bot',
+          timestamp: new Date()
+        }
+      ]);
+    } catch (error) {
+      console.error('Error fetching response:', error);
+      setMessages(prev => [
+        ...prev.filter(msg => msg.sender !== 'loading'),
+        {
+          id: prev.length + 1,
+          text: 'Error: Unable to reach the chatbot service.',
+          sender: 'bot',
+          timestamp: new Date()
+        }
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -66,14 +104,17 @@ function App() {
     <Box className="chat-app-container">
       <CssBaseline />
       <AppBar position="static">
-        <Toolbar>
+        <Toolbar sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Chat Application
+          </Typography>
+          <Typography variant="caption" sx={{ fontStyle: 'italic', opacity: 0.8 }}>
+            Alpha Build
           </Typography>
         </Toolbar>
       </AppBar>
       
-      {/* Compact introduction section */}
+      {/* Intro */}
       <Container maxWidth="lg" sx={{ py: 2, px: 3 }}>
         <Typography variant="subtitle1" sx={{ 
           mb: 1,
@@ -84,15 +125,14 @@ function App() {
         </Typography>
       </Container>
       
-      {/* Chat area with sticky input */}
+      {/* Chat area */}
       <Container maxWidth="lg" sx={{ 
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        height: 'calc(100vh - 128px)', // Adjust based on header and description height
+        height: 'calc(100vh - 128px)',
         position: 'relative'
       }}>
-        {/* Messages area - scrollable */}
         <Box sx={{ 
           flex: 1,
           overflowY: 'auto',
@@ -105,19 +145,29 @@ function App() {
           {messages.map((message) => (
             <Box
               key={message.id}
-              className={`message-container ${message.sender === 'user' ? 'user-message' : 'bot-message'}`}
+              className={`message-container ${
+                message.sender === 'user'
+                  ? 'user-message'
+                  : message.sender === 'bot'
+                  ? 'bot-message'
+                  : 'loading-message'
+              }`}
             >
               <Typography variant="body1">{message.text}</Typography>
-              <Typography 
-                className={`message-timestamp ${message.sender === 'user' ? 'user-timestamp' : 'bot-timestamp'}`}
-              >
-                {message.timestamp.toLocaleTimeString()}
-              </Typography>
+              {message.sender !== 'loading' && (
+                <Typography 
+                  className={`message-timestamp ${
+                    message.sender === 'user' ? 'user-timestamp' : 'bot-timestamp'
+                  }`}
+                >
+                  {message.timestamp.toLocaleTimeString()}
+                </Typography>
+              )}
             </Box>
           ))}
         </Box>
         
-        {/* Sticky input area */}
+        {/* Input */}
         <Box sx={{
           position: 'sticky',
           bottom: 0,
@@ -137,11 +187,12 @@ function App() {
               placeholder="Type your message here..."
               variant="outlined"
               className="message-input"
+              disabled={loading}
             />
             <IconButton 
               className="send-button"
               onClick={handleSendMessage}
-              disabled={input.trim() === ''}
+              disabled={input.trim() === '' || loading}
             >
               <SendIcon />
             </IconButton>
