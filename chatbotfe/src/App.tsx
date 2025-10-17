@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
-import { 
-  Box, 
-  CssBaseline, 
-  AppBar, 
-  Toolbar, 
-  Typography, 
-  TextField, 
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Box,
+  CssBaseline,
+  AppBar,
+  Toolbar,
+  Typography,
+  TextField,
   IconButton,
-  Container
+  Container,
+  Chip,
+  Stack
 } from '@mui/material';
 import { Send as SendIcon } from '@mui/icons-material';
-import './app.css';
+import './App.css'; // NOTE: fixed case from './app.css' -> './App.css'
 
 interface Message {
   id: number;
@@ -23,13 +25,45 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
-      text: 'Hello! ask me about one of Brathay Properties?',
+      text: 'Hello! Ask me about one of our Brathay properties.',
       sender: 'bot',
       timestamp: new Date()
     }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+
+  // -------- Persist conversation locally (so users don't lose context on refresh)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('chat.messages');
+      if (raw) {
+        const parsed: Message[] = JSON.parse(raw).map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }));
+        if (parsed.length) setMessages(parsed);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('chat.messages', JSON.stringify(messages));
+    } catch {}
+  }, [messages]);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [messages.length, loading]);
+
+  // Quick suggestions on empty thread
+  const suggestions = useMemo(
+    () => ['Find availability for next weekend', 'Dog-friendly cottages', 'Compare two properties'],
+    []
+  );
 
   const handleSendMessage = async () => {
     if (input.trim() === '') return;
@@ -46,18 +80,38 @@ function App() {
     const userInput = input; // preserve input
     setInput('');
 
-    // Show "bot is typing" message
+    // Show typing indicator
     setLoading(true);
     const loadingMessage: Message = {
       id: messages.length + 2,
-      text: 'Bot is typing...',
+      text: '…',
       sender: 'loading',
       timestamp: new Date()
     };
     setMessages(prev => [...prev, loadingMessage]);
 
+    // -------- Conversational memory (client): build a compact history array
+    // We'll include the last ~8 turns (16 messages) excluding 'loading'
+    const memory = [...messages, newUserMessage]
+      .filter(m => m.sender !== 'loading')
+      .slice(-16)
+      .map(m => ({
+        role: m.sender === 'user' ? 'user' : 'assistant',
+        content: m.text
+      }));
+
     try {
-      // Call API
+      // NOTE: keep your existing request working right now.
+      // NEW: When your backend supports memory, REPLACE the body below with the commented one.
+      //
+      // --- NEW BODY (enable when ready):
+      // body: JSON.stringify({
+      //   question: userInput,
+      //   history: memory,                  // <-- full conversation snippet
+      //   conversation_id: getOrCreateCid() // <-- optional: stable thread id
+      // })
+      //
+      // --- CURRENT BODY (kept for compatibility):
       const response = await fetch('https://chatbot-pd-fe.onrender.com/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,7 +121,7 @@ function App() {
       const data = await response.json();
       const botReply = data.response || 'Sorry, no response received.';
 
-      // Replace "Bot is typing..." with actual response
+      // Replace typing indicator with actual response
       setMessages(prev => [
         ...prev.filter(msg => msg.sender !== 'loading'),
         {
@@ -93,6 +147,17 @@ function App() {
     }
   };
 
+  // Utility: stable conversation id (kept client-side)
+  function getOrCreateCid() {
+    const key = 'chat.conversation_id';
+    let cid = localStorage.getItem(key);
+    if (!cid) {
+      cid = Math.random().toString(36).slice(2);
+      localStorage.setItem(key, cid);
+    }
+    return cid;
+  }
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -103,46 +168,55 @@ function App() {
   return (
     <Box className="chat-app-container">
       <CssBaseline />
-      <AppBar position="static">
-        <Toolbar sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Chat Application
-          </Typography>
-          <Typography variant="caption" sx={{ fontStyle: 'italic', opacity: 0.8 }}>
-            Alpha Build
-          </Typography>
+      <AppBar position="sticky" elevation={0} className="appbar-blur">
+        <Toolbar sx={{ width: '100%', alignItems: 'center', gap: 1, py: 1.25 }}>
+          <Box
+            sx={{
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              bgcolor: 'var(--brand-primary)'
+            }}
+          />
+          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 700, color: 'var(--ink)', letterSpacing: 0.2, lineHeight: 1 }}
+              noWrap
+            >
+             GH-DK Chat Bot
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'var(--muted)' }} noWrap>
+              Alpha 2.0
+            </Typography>
+          </Box>
         </Toolbar>
       </AppBar>
-      
-      {/* Intro */}
+
+      {/* Intro / suggestions */}
       <Container maxWidth="lg" sx={{ py: 2, px: 3 }}>
-        <Typography variant="subtitle1" sx={{ 
-          mb: 1,
-          fontWeight: 'medium',
-          color: 'text.secondary'
-        }}>
-          Welcome to our chat interface. Type a message below to start chatting!
+        <Typography
+          variant="subtitle1"
+          sx={{ mb: 1, fontWeight: 500, color: 'var(--muted)' }}
+        >
+          Ask about dates, availability, or property details.
+           {/* I’ll remember what you’ve said in this chat. */}
         </Typography>
       </Container>
-      
+
       {/* Chat area */}
-      <Container maxWidth="lg" sx={{ 
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        height: 'calc(100vh - 128px)',
-        position: 'relative'
-      }}>
-        <Box sx={{ 
+      <Container
+        maxWidth="lg"
+        sx={{
           flex: 1,
-          overflowY: 'auto',
-          padding: '16px',
-          border: '1px solid #e0e0e0',
-          borderRadius: '8px',
-          backgroundColor: '#fafafa',
-          marginBottom: '16px'
-        }}>
-          {messages.map((message) => (
+          display: 'flex',
+          flexDirection: 'column',
+          height: 'calc(100vh - 180px)',
+          position: 'relative'
+        }}
+      >
+        <Box ref={scrollerRef} className="chat-scroll">
+          {messages.map(message => (
             <Box
               key={message.id}
               className={`message-container ${
@@ -153,46 +227,52 @@ function App() {
                   : 'loading-message'
               }`}
             >
-              <Typography variant="body1">{message.text}</Typography>
+              <Typography variant="body1">
+                {message.sender === 'loading' ? 'Thinking…' : message.text}
+              </Typography>
               {message.sender !== 'loading' && (
-                <Typography 
+                <Typography
                   className={`message-timestamp ${
                     message.sender === 'user' ? 'user-timestamp' : 'bot-timestamp'
                   }`}
                 >
-                  {message.timestamp.toLocaleTimeString()}
+                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Typography>
               )}
             </Box>
           ))}
         </Box>
-        
+
         {/* Input */}
-        <Box sx={{
-          position: 'sticky',
-          bottom: 0,
-          backgroundColor: 'background.paper',
-          padding: '16px 0',
-          borderTop: '1px solid #e0e0e0',
-          zIndex: 1
-        }}>
+        <Box
+          sx={{
+            position: 'sticky',
+            bottom: 0,
+            backgroundColor: 'transparent',
+            paddingTop: '8px',
+            borderTop: '1px solid #ececec',
+            zIndex: 1
+          }}
+          className="safe-bottom"
+        >
           <Box className="input-area">
             <TextField
               fullWidth
               multiline
-              maxRows={4}
+              maxRows={5}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Type your message here..."
+              placeholder="Type your message here…"
               variant="outlined"
               className="message-input"
               disabled={loading}
             />
-            <IconButton 
+            <IconButton
               className="send-button"
               onClick={handleSendMessage}
               disabled={input.trim() === '' || loading}
+              aria-label="Send message"
             >
               <SendIcon />
             </IconButton>
