@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Box,
   CssBaseline,
@@ -8,8 +8,6 @@ import {
   TextField,
   IconButton,
   Container,
-  Chip,
-  Stack
 } from '@mui/material';
 import { Send as SendIcon } from '@mui/icons-material';
 import './App.css'; // NOTE: fixed case from './app.css' -> './App.css'
@@ -60,10 +58,10 @@ function App() {
   }, [messages.length, loading]);
 
   // Quick suggestions on empty thread
-  const suggestions = useMemo(
-    () => ['Find availability for next weekend', 'Dog-friendly cottages', 'Compare two properties'],
-    []
-  );
+  // const suggestions = useMemo(
+  //   () => ['Find availability for next weekend', 'Dog-friendly cottages', 'Compare two properties'],
+  //   []
+  // );
 
   const handleSendMessage = async () => {
     if (input.trim() === '') return;
@@ -92,13 +90,13 @@ function App() {
 
     // -------- Conversational memory (client): build a compact history array
     // We'll include the last ~8 turns (16 messages) excluding 'loading'
-    const memory = [...messages, newUserMessage]
-      .filter(m => m.sender !== 'loading')
-      .slice(-16)
-      .map(m => ({
-        role: m.sender === 'user' ? 'user' : 'assistant',
-        content: m.text
-      }));
+    // const memory = [...messages, newUserMessage]
+    //   .filter(m => m.sender !== 'loading')
+    //   .slice(-16)
+    //   .map(m => ({
+    //     role: m.sender === 'user' ? 'user' : 'assistant',
+    //     content: m.text
+    //   }));
 
     try {
       // NOTE: keep your existing request working right now.
@@ -148,15 +146,15 @@ function App() {
   };
 
   // Utility: stable conversation id (kept client-side)
-  function getOrCreateCid() {
-    const key = 'chat.conversation_id';
-    let cid = localStorage.getItem(key);
-    if (!cid) {
-      cid = Math.random().toString(36).slice(2);
-      localStorage.setItem(key, cid);
-    }
-    return cid;
-  }
+  // function getOrCreateCid() {
+  //   const key = 'chat.conversation_id';
+  //   let cid = localStorage.getItem(key);
+  //   if (!cid) {
+  //     cid = Math.random().toString(36).slice(2);
+  //     localStorage.setItem(key, cid);
+  //   }
+  //   return cid;
+  // }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
